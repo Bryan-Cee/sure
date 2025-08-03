@@ -7,6 +7,9 @@ class Provider::Registry
 
   validates :concept, inclusion: { in: CONCEPTS }
 
+  require 'net/http'
+  require 'uri'
+
   class << self
     def for_concept(concept)
       new(concept.to_sym)
@@ -67,6 +70,21 @@ class Provider::Registry
 
         Provider::Openai.new(access_token)
       end
+
+      def ollama
+        base_url = ENV.fetch("OLLAMA_BASE_URL", Setting.ollama_base_url)
+        
+        # Check if Ollama is accessible
+        begin
+          uri = URI("#{base_url}/api/version")
+          response = Net::HTTP.get_response(uri)
+          return Provider::Ollama.new(base_url) if response.code == '200'
+        rescue
+          # Ollama not accessible
+        end
+        
+        nil
+      end
   end
 
   def initialize(concept)
@@ -96,9 +114,9 @@ class Provider::Registry
       when :securities
         %i[twelve_data]
       when :llm
-        %i[openai]
+        %i[ollama openai]  # Prioritize Ollama first
       else
-        %i[plaid_us plaid_eu github openai]
+        %i[plaid_us plaid_eu github openai ollama]
       end
     end
 end
