@@ -1,0 +1,87 @@
+#!/bin/bash
+
+# Sure AI Chat Test Script
+# This script helps you test the local LLM integration
+
+echo "🤖 Sure AI Chat Test"
+echo "===================="
+
+# Check if Ollama is accessible
+echo "🔍 Checking Ollama connectivity..."
+if curl -s http://localhost:11434/api/version > /dev/null 2>&1; then
+    echo "✅ Ollama is running locally"
+    
+    # Check if web container can access Ollama
+    if docker compose exec -T web curl -s http://host.docker.internal:11434/api/version > /dev/null 2>&1; then
+        echo "✅ Web container can access Ollama"
+    else
+        echo "❌ Web container cannot access Ollama"
+        echo "   Check your Docker network configuration"
+        exit 1
+    fi
+else
+    echo "❌ Ollama is not running"
+    echo "   Run: ollama serve"
+    exit 1
+fi
+
+# Check available models
+echo ""
+echo "📋 Available Ollama models:"
+ollama list | grep -E "(NAME|llama3\.2)" || echo "   No compatible models found"
+
+# Check if llama3.2 is available
+if ollama list | grep -q "llama3.2"; then
+    echo "✅ llama3.2 model is available"
+else
+    echo "⚠️  llama3.2 model not found"
+    echo "   Download with: ollama pull llama3.2"
+fi
+
+echo ""
+echo "🧪 Testing Ollama directly..."
+echo "Sending test request to Ollama..."
+
+# Test Ollama directly with a simple request
+test_response=$(curl -s -X POST http://localhost:11434/api/generate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "llama3.2",
+    "prompt": "What is 2+2?",
+    "stream": false
+  }' | jq -r '.response' 2>/dev/null)
+
+if [ -n "$test_response" ] && [ "$test_response" != "null" ]; then
+    echo "✅ Ollama responded: ${test_response:0:100}..."
+else
+    echo "❌ Ollama test failed"
+    echo "   Try: ollama run llama3.2 'What is 2+2?'"
+fi
+
+echo ""
+echo "🌐 Sure Application Status:"
+if curl -s http://localhost:3000 > /dev/null 2>&1; then
+    echo "✅ Sure web application is running"
+    echo ""
+    echo "🎯 How to test AI chat:"
+    echo "   1. Open: http://localhost:3000"
+    echo "   2. Create an account or log in"
+    echo "   3. Look for 'Chat' or 'AI Assistant' in the navigation"
+    echo "   4. Start a conversation!"
+    echo ""
+    echo "💬 Example questions to try:"
+    echo "   • 'How can I budget my monthly expenses?'"  
+    echo "   • 'What's the best way to track my spending?'"
+    echo "   • 'Help me categorize my transactions'"
+    echo ""
+    echo "🔍 If AI features don't work:"
+    echo "   • Check Docker logs: docker compose logs web | grep -i ollama"
+    echo "   • Verify environment: echo \$OLLAMA_BASE_URL"
+    echo "   • Test connectivity: ./bin/ai-test"
+else
+    echo "❌ Sure web application is not responding"
+    echo "   Run: docker compose up -d"
+fi
+
+echo ""
+echo "🎉 Setup complete! Your local AI chat should be working."

@@ -1,3 +1,5 @@
+require 'net/http'
+
 class User < ApplicationRecord
   has_secure_password
 
@@ -28,6 +30,9 @@ class User < ApplicationRecord
   end
 
   validate :profile_image_size
+
+  # Enable AI features by default for self-hosted installations
+  after_create :enable_ai_for_self_hosted
 
   generates_token_for :password_reset, expires_in: 15.minutes do
     password_salt&.last(10)
@@ -86,12 +91,24 @@ class User < ApplicationRecord
     show_ai_sidebar
   end
 
+  def ai_working?
+    # Use a completely different method name  
+    return true unless Rails.application.config.app_mode.self_hosted?
+    
+    # For self-hosted mode, check if we have Ollama or OpenAI available  
+    ollama_working = ENV["OLLAMA_BASE_URL"].present? && ollama_reachable?
+    openai_working = ENV["OPENAI_ACCESS_TOKEN"].present?
+    
+    ollama_working || openai_working
+  end
+  
+  # Wrapper method for backward compatibility
   def ai_available?
-    !Rails.application.config.app_mode.self_hosted? || ENV["OPENAI_ACCESS_TOKEN"].present?
+    ai_working?
   end
 
   def ai_enabled?
-    ai_enabled && ai_available?
+    ai_enabled && ai_working?
   end
 
   # Deactivation
@@ -207,5 +224,26 @@ class User < ApplicationRecord
 
     def generate_backup_codes
       8.times.map { SecureRandom.hex(4) }
+    end
+
+    private
+
+    def enable_ai_for_self_hosted
+      # Auto-enable AI features for self-hosted installations when LLM providers are available
+      if Rails.application.config.app_mode.self_hosted? && ai_working?
+        update_column(:ai_enabled, true)
+      end
+    end
+
+    def ollama_reachable?
+      return false unless ENV["OLLAMA_BASE_URL"].present?
+      
+      begin
+        uri = URI("#{ENV['OLLAMA_BASE_URL']}/api/version")
+        response = Net::HTTP.get_response(uri)
+        response.code == '200'
+      rescue
+        false
+      end
     end
 end

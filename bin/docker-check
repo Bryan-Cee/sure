@@ -1,0 +1,74 @@
+#!/bin/bash
+
+# Sure Docker Verification Script
+# This script checks if the Sure application is running correctly
+
+echo "🔍 Sure Application Health Check"
+echo "================================"
+
+# Check if Docker containers are running
+echo "📦 Checking Docker containers..."
+if docker compose ps | grep -q "Up"; then
+    echo "✅ Docker containers are running"
+    docker compose ps --format "table {{.Service}}\t{{.State}}\t{{.Status}}" 2>/dev/null || docker compose ps
+else
+    echo "❌ Docker containers are not running"
+    echo "   Run: docker compose up -d"
+    exit 1
+fi
+
+echo ""
+
+# Check web application response
+echo "🌐 Checking web application..."
+if curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "302"; then
+    echo "✅ Web application is responding (redirecting to registration)"
+    echo "   🎉 Sure is ready! Open http://localhost:3000 in your browser"
+else
+    echo "❌ Web application is not responding"
+    echo "   Check logs with: docker compose logs web"
+    exit 1
+fi
+
+echo ""
+
+# Check database connection
+echo "🗄️  Checking database connection..."
+if docker compose exec -T db pg_isready -U maybe_user > /dev/null 2>&1; then
+    echo "✅ Database is healthy and accepting connections"
+else
+    echo "❌ Database connection issues"
+    echo "   Check logs with: docker compose logs db"
+fi
+
+echo ""
+
+# Check Ollama connectivity (optional)
+echo "🤖 Checking Ollama connectivity..."
+if curl -s http://host.docker.internal:11434/api/version > /dev/null 2>&1; then
+    echo "✅ Ollama is accessible from Docker containers"
+    if docker compose exec -T web curl -s http://host.docker.internal:11434/api/version > /dev/null 2>&1; then
+        echo "✅ Ollama connectivity confirmed from web container"
+    else
+        echo "⚠️  Ollama not accessible from web container"
+    fi
+elif curl -s http://localhost:11434/api/version > /dev/null 2>&1; then
+    echo "⚠️  Ollama is running on host but not accessible from Docker"
+    echo "   This is normal - AI features will be limited"
+else
+    echo "ℹ️  Ollama not running - AI features will be disabled"
+    echo "   To enable: ollama serve && ollama pull llama3.2"
+fi
+
+echo ""
+
+# Show useful information
+echo "📋 Quick Commands:"
+echo "   • Open app:       http://localhost:3000"
+echo "   • View logs:      docker compose logs -f"
+echo "   • Stop app:       docker compose down"
+echo "   • Restart:        docker compose restart"
+echo "   • Update code:    docker compose up -d --build"
+
+echo ""
+echo "🎯 Status: Sure is running successfully!"

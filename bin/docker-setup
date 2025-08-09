@@ -1,0 +1,143 @@
+#!/bin/bash
+
+# Sure Local Docker Setup Script
+# This script helps set up the Sure app with local Ollama support
+
+set -e
+
+echo "🎯 Sure Local Docker Setup with Ollama Support"
+echo "=============================================="
+
+# Check if Docker is installed
+if ! command -v docker &> /dev/null; then
+    echo "❌ Docker is not installed. Please install Docker first:"
+    echo "   https://docs.docker.com/get-docker/"
+    exit 1
+fi
+
+# Check if Docker Compose is available
+if ! docker compose version &> /dev/null; then
+    echo "❌ Docker Compose is not available. Please install Docker Compose."
+    exit 1
+fi
+
+echo "✅ Docker and Docker Compose are available"
+
+# Create .env file if it doesn't exist
+if [ ! -f .env ]; then
+    echo "📝 Creating .env file from template..."
+    cp .env.docker.example .env
+    echo "✅ Created .env file. You can customize it as needed."
+else
+    echo "ℹ️  .env file already exists"
+fi
+
+# Check if Ollama is running
+echo "🤖 Checking Ollama status..."
+if curl -s http://localhost:11434/api/version > /dev/null 2>&1; then
+    echo "✅ Ollama is running on localhost:11434"
+
+    # Check if llama3.2 model is available
+    if ollama list | grep -q "llama3.2"; then
+        echo "✅ llama3.2 model is available"
+    else
+        echo "⚠️  llama3.2 model not found. You may want to download it:"
+        echo "   ollama pull llama3.2"
+    fi
+else
+    echo "⚠️  Ollama is not running. To use local LLM features:"
+    echo "   1. Install Ollama: https://ollama.ai/"
+    echo "   2. Start Ollama: ollama serve"
+    echo "   3. Download a model: ollama pull llama3.2"
+    echo "   (The app will work without Ollama, but AI features will be disabled)"
+fi
+
+# Build and start the application
+echo "🏗️  Building and starting the application..."
+echo "This may take a few minutes on first run..."
+
+# Function to reset database if needed
+reset_database() {
+    echo "🔄 Resetting database due to connection issues..."
+    docker compose down > /dev/null 2>&1 || true
+    docker volume rm sure_postgres-data > /dev/null 2>&1 || true
+    echo "✅ Database reset complete"
+}
+
+# Check if there are existing containers and database issues
+if docker volume ls -q | grep -q "sure_postgres-data"; then
+    echo "ℹ️  Existing database found. If you encounter connection issues, we'll reset it."
+fi
+
+# Stop any existing containers
+docker compose down > /dev/null 2>&1 || true
+
+# Build and start
+echo "🚀 Starting services..."
+docker compose up -d --build
+
+echo "⏱️  Waiting for services to be ready..."
+
+# Wait for the web service to be healthy
+max_attempts=60
+attempt=0
+database_reset_attempted=false
+
+while [ $attempt -lt $max_attempts ]; do
+    if curl -s http://localhost:3000 > /dev/null 2>&1; then
+        echo "✅ Application is ready!"
+        break
+    fi
+    
+    # Check for database connection errors in logs
+    if [ $attempt -gt 10 ] && [ "$database_reset_attempted" = false ]; then
+        if docker compose logs web 2>/dev/null | grep -q "password authentication failed\|PG::ConnectionBad"; then
+            echo "🔍 Detected database authentication issue. Attempting to reset..."
+            database_reset_attempted=true
+            reset_database
+            echo "🚀 Restarting with fresh database..."
+            docker compose up -d --build
+            attempt=0  # Reset attempt counter
+            continue
+        fi
+    fi
+    
+    attempt=$((attempt + 1))
+    if [ $attempt -eq $max_attempts ]; then
+        echo "❌ Application failed to start within expected time"
+        echo ""
+        echo "🔍 Check logs for issues:"
+        echo "   docker compose logs web"
+        echo ""
+        echo "🔧 Common fixes:"
+        echo "   1. Reset database: docker compose down && docker volume rm sure_postgres-data && docker compose up -d"
+        echo "   2. Check .env file settings"
+        echo "   3. Ensure Docker has enough resources"
+        exit 1
+    fi
+    
+    if [ $((attempt % 10)) -eq 0 ]; then
+        echo "   Still waiting... (attempt $attempt/$max_attempts)"
+    fi
+    sleep 3
+doneecho ""
+echo "🎉 Sure is now running!"
+echo "================================"
+echo "🌐 Open your browser and go to: http://localhost:3000"
+echo "📧 Create your first account on the login page"
+echo ""
+echo "💡 Useful commands:"
+echo "   View logs:        docker compose logs -f"
+echo "   Stop application: docker compose down"
+echo "   Restart:          docker compose restart"
+echo "   Update code:      docker compose up -d --build"
+echo ""
+echo "🤖 AI Features:"
+if curl -s http://localhost:11434/api/version > /dev/null 2>&1; then
+    echo "   ✅ Ollama is configured and should work for local AI chat"
+else
+    echo "   ⚠️  Ollama not detected - AI features will be limited"
+    echo "      To enable: install Ollama and run 'ollama serve'"
+fi
+echo ""
+echo "🔧 Need help? Check the documentation in /docs or open an issue on GitHub"

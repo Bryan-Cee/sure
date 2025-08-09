@@ -9,26 +9,29 @@ Sure now supports both OpenAI and local LLMs through Ollama. The system will aut
 ## Setting up Ollama
 
 1. **Install Ollama**
+
    ```bash
    # On macOS
    brew install ollama
-   
+
    # On Linux
    curl -fsSL https://ollama.ai/install.sh | sh
    ```
 
 2. **Start Ollama**
+
    ```bash
    ollama serve
    ```
 
 3. **Download a model**
+
    ```bash
-   # Download Llama 3.1 (recommended)
-   ollama pull llama3.1
-   
-   # Or try other models
+   # Download Llama 3.2 (recommended)
    ollama pull llama3.2
+
+   # Or try other models
+   ollama pull llama3.1
    ollama pull mistral
    ollama pull codellama
    ```
@@ -57,7 +60,7 @@ services:
     environment:
       # Ollama configuration
       OLLAMA_BASE_URL: http://host.docker.internal:11434
-      
+
       # Keep OpenAI as fallback (optional)
       OPENAI_ACCESS_TOKEN: ${OPENAI_ACCESS_TOKEN}
 ```
@@ -77,8 +80,8 @@ The system checks providers in this order for LLM tasks:
 
 The Ollama provider supports these models:
 
-- `llama3.1` (recommended)
-- `llama3.2`
+- `llama3.2` (recommended)
+- `llama3.1`
 - `mistral`
 - `codellama`
 - `qwen2.5`
@@ -110,10 +113,10 @@ The Ollama provider supports these models:
 
 ### Model Selection
 
-- **llama3.1** - Best balance of capability and performance
-- **mistral** - Fast and efficient for most tasks  
+- **llama3.2** - Latest with improved capabilities (recommended)
+- **llama3.1** - Excellent balance of capability and performance
+- **mistral** - Fast and efficient for most tasks
 - **codellama** - Better for code-related financial queries
-- **llama3.2** - Latest with improved capabilities
 
 ## Troubleshooting
 
@@ -123,7 +126,7 @@ If the system falls back to OpenAI, check:
 
 1. Ollama is running: `ollama list`
 2. Accessible at correct URL: `curl http://localhost:11434/api/version`
-3. Model is downloaded: `ollama pull llama3.1`
+3. Model is downloaded: `ollama pull llama3.2`
 
 ### Slow Responses
 

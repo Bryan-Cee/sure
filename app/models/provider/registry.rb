@@ -73,7 +73,7 @@ class Provider::Registry
 
       def ollama
         base_url = ENV.fetch("OLLAMA_BASE_URL", Setting.ollama_base_url)
-        
+
         # Check if Ollama is accessible
         begin
           uri = URI("#{base_url}/api/version")
@@ -82,7 +82,7 @@ class Provider::Registry
         rescue
           # Ollama not accessible
         end
-        
+
         nil
       end
   end
